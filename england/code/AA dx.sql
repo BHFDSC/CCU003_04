@@ -19,7 +19,8 @@
 
 -- COMMAND ----------
 
-select max(disdate) from dars_nic_391419_j3w9t_collab.hes_apc_ext_all_years where year(disdate) < 2098
+--select max(disdate) from dars_nic_391419_j3w9t_collab.hes_apc_ext_all_years where year(disdate) < 2098
+select max(disdate) from dars_nic_391419_j3w9t_collab.hes_apc_all_years where year(disdate) < 2098
 
 -- COMMAND ----------
 
@@ -48,6 +49,20 @@ select max(disdate) from dars_nic_391419_j3w9t_collab.ccu003_04_base_nh where ye
 -- COMMAND ----------
 
 -- MAGIC %md
+-- MAGIC Create widget to provide spec-specific table/view names
+
+-- COMMAND ----------
+
+-- MAGIC %py
+-- MAGIC dbutils.widgets.removeAll()
+
+-- COMMAND ----------
+
+CREATE WIDGET TEXT ccu003_04_spec DEFAULT 'aa_dx'
+
+-- COMMAND ----------
+
+-- MAGIC %md
 -- MAGIC <h4>Step 2 - Episodes</h4>
 
 -- COMMAND ----------
@@ -66,7 +81,7 @@ refresh table dars_nic_391419_j3w9t_collab.ccu003_04_base_nh
 -----------------------------------------------
 -- This query returns one row per each AA diagnosis for each episode - this means there are multiple rows per episode!!!
 
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_source_episodes AS
+CREATE OR REPLACE GLOBAL TEMP VIEW nh_${ccu003_04_spec}_temp_source_episodes AS
 
 WITH extract_exploded AS
 ( -- need to make a CTE where the dx/op code fields are exploded into rows - then we have one row for each dx or op in each episode.
@@ -88,30 +103,8 @@ LEFT(code, 3) = 'I71'
 
 -- COMMAND ----------
 
-select count(*) FROM global_temp.nh_temp_source_episodes
-
--- COMMAND ----------
-
 -- MAGIC %md
 -- MAGIC Run the episodes notebook
-
--- COMMAND ----------
-
--- MAGIC %md
--- MAGIC From the episodes with the condition, identfy the first episode per patient within the time window.
-
--- COMMAND ----------
-
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_first_episodes AS-- get first episode for each person where they had the spec condition in the time window
-
-SELECT distinct
-PERSON_ID_DEID AS PERSON_ID,
-SUSSPELLID AS SPELL_ID,
-EPIKEY,
-CASE WHEN COALESCE(admidate, '1800-01-01') IN ('1801-01-01', '1800-01-01') THEN disdate ELSE admidate END AS Admidate,
-CASE WHEN COALESCE(disdate, '1800-01-01') IN ('1801-01-01', '1800-01-01') THEN admidate ELSE disdate END AS Disdate
-FROM dars_nic_391419_j3w9t_collab.ccu003_04_base_nh
-WHERE epikey IN (SELECT FIRST(EPIKEY) OVER (PARTITION BY PERSON_ID ORDER BY ADMIDATE ASC, EPIORDER ASC) AS EPIKEY FROM global_temp.nh_temp_source_episodes)
 
 -- COMMAND ----------
 
@@ -120,137 +113,156 @@ WHERE epikey IN (SELECT FIRST(EPIKEY) OVER (PARTITION BY PERSON_ID ORDER BY ADMI
 
 -- COMMAND ----------
 
-DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base
+DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base AS
+CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base AS
 
-SELECT distinct
-PERSON_ID_DEID AS PERSON_ID,
-SUSSPELLID AS SPELL_ID,
+SELECT DISTINCT
+base.PERSON_ID_DEID AS PERSON_ID,
+base.SUSSPELLID AS SPELL_ID,
 base.EPIKEY,
 --DATEDIFF(base.Admidate, initial.Disdate) AS datediff,
-initial.Disdate AS Index_Disdate,
-admiage,
-sex,
-ethnos,
+--initial.Disdate AS Index_Disdate,
+base.admiage,
+base.sex,
+base.ethnos,
 COALESCE(base.admidate, '1800-01-01') AS admidate,
 COALESCE(base.disdate, '1800-01-01') AS disdate,
-epistart,
-epiend,
-epidur,
-epiorder,
-admisorc,
-epistat,
-procodet,
-sitetret,
-protype,
-admimeth,
-lsoa11,
-resgor_ons,
-diag_01, 
-diag_02, 
-diag_03, 
-diag_04, 
-diag_05, 
-diag_06, 
-diag_07, 
-diag_08, 
-diag_09, 
-diag_10, 
-diag_11, 
-diag_12, 
-diag_13, 
-diag_14, 
-diag_15, 
-diag_16, 
-diag_17, 
-diag_18, 
-diag_19, 
-diag_20,
-diag_4_concat,
-opertn_01,
-opdate_01, 
-opertn_02,
-opdate_02, 
-opertn_03,
-opdate_03, 
-opertn_04,
-opdate_04, 
-opertn_05,
-opdate_05, 
-opertn_06,
-opdate_06, 
-opertn_07,
-opdate_07, 
-opertn_08,
-opdate_08, 
-opertn_09,
-opdate_09, 
-opertn_10,
-opdate_10, 
-opertn_11,
-opdate_11, 
-opertn_12,
-opdate_12, 
-opertn_13,
-opdate_13, 
-opertn_14,
-opdate_14, 
-opertn_15,
-opdate_15, 
-opertn_16,
-opdate_16, 
-opertn_17,
-opdate_17, 
-opertn_18,
-opdate_18, 
-opertn_19,
-opdate_19, 
-opertn_20,
-opdate_20, 
-opertn_21,
-opdate_21, 
-opertn_22,
-opdate_22,
-opertn_23, 
-opdate_23, 
-opertn_24,
-opdate_24,
-opertn_3_concat,
-opertn_4_concat, 
-mainspef,
-tretspef,
-dismeth,
-speldur,
-disdest,
-spelbgin,
-spelend,
-fde,
-fae,
-classpat,
-IF(dismeth = 4, 1, 0) AS died
+base.epistart,
+base.epiend,
+base.epidur,
+base.epiorder,
+base.admisorc,
+base.epistat,
+base.procodet,
+base.sitetret,
+base.protype,
+base.admimeth,
+base.lsoa11,
+base.resgor_ons,
+base.diag_01, 
+base.diag_02, 
+base.diag_03, 
+base.diag_04, 
+base.diag_05, 
+base.diag_06, 
+base.diag_07, 
+base.diag_08, 
+base.diag_09, 
+base.diag_10, 
+base.diag_11, 
+base.diag_12, 
+base.diag_13, 
+base.diag_14, 
+base.diag_15, 
+base.diag_16, 
+base.diag_17, 
+base.diag_18, 
+base.diag_19, 
+base.diag_20,
+base.diag_4_concat,
+base.opertn_01,
+base.opdate_01, 
+base.opertn_02,
+base.opdate_02, 
+base.opertn_03,
+base.opdate_03, 
+base.opertn_04,
+base.opdate_04, 
+base.opertn_05,
+base.opdate_05, 
+base.opertn_06,
+base.opdate_06, 
+base.opertn_07,
+base.opdate_07, 
+base.opertn_08,
+base.opdate_08, 
+base.opertn_09,
+base.opdate_09, 
+base.opertn_10,
+base.opdate_10, 
+base.opertn_11,
+base.opdate_11, 
+base.opertn_12,
+base.opdate_12, 
+base.opertn_13,
+base.opdate_13, 
+base.opertn_14,
+base.opdate_14, 
+base.opertn_15,
+base.opdate_15, 
+base.opertn_16,
+base.opdate_16, 
+base.opertn_17,
+base.opdate_17, 
+base.opertn_18,
+base.opdate_18, 
+base.opertn_19,
+base.opdate_19, 
+base.opertn_20,
+base.opdate_20, 
+base.opertn_21,
+base.opdate_21, 
+base.opertn_22,
+base.opdate_22,
+base.opertn_23, 
+base.opdate_23, 
+base.opertn_24,
+base.opdate_24,
+base.opertn_3_concat,
+base.opertn_4_concat, 
+base.mainspef,
+base.tretspef,
+base.dismeth,
+base.speldur,
+base.disdest,
+base.spelbgin,
+base.spelend,
+base.fde,
+base.fae,
+base.classpat,
+IF(base.dismeth = 4, 1, 0) AS died
 FROM dars_nic_391419_j3w9t_collab.ccu003_04_base_nh AS base INNER JOIN 
 (
-    SELECT DISTINCT * FROM global_temp.nh_temp_first_episodes
+    SELECT DISTINCT PERSON_ID, SPELL_ID FROM global_temp.nh_${ccu003_04_spec}_temp_source_episodes
 )
-AS initial ON base.PERSON_ID_DEID = initial.PERSON_ID
-WHERE
-(DATEDIFF(base.Admidate, initial.Disdate) BETWEEN 0 AND 30 AND base.Admidate >= initial.Admidate AND initial.Admidate IS NOT NULL AND initial.Admidate > '1801-01-01') --capture any episode which starts within 30 days of the end of the index episode
-OR base.epikey = initial.EPIKEY --capture index episode (required where index episode is longer than 1 day so not captured by the above)
+AS qualifying ON base.PERSON_ID_DEID = qualifying.PERSON_ID AND base.SUSSPELLID = qualifying.SPELL_ID
+
+--OLD METHOD - within 30 days of first admission
+--FROM dars_nic_391419_j3w9t_collab.ccu003_04_base_nh AS base INNER JOIN 
+--(
+--    SELECT DISTINCT * FROM global_temp.nh_${ccu003_04_spec}_temp_first_episodes
+--)
+--AS initial ON base.PERSON_ID_DEID = initial.PERSON_ID
+--WHERE
+--(DATEDIFF(base.Admidate, initial.Disdate) BETWEEN 0 AND 30 AND base.Admidate >= initial.Admidate AND initial.Admidate IS NOT NULL AND initial.Admidate > '1801-01-01') --capture any episode which starts within 30 days of the end of the index episode
+--OR base.epikey = initial.EPIKEY --capture index episode (required where index episode is longer than 1 day so not captured by the above)
 
 -- COMMAND ----------
 
-ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base OWNER TO `rmhikmc@ucl.ac.uk`
+ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base OWNER TO `rmhikmc@ucl.ac.uk`
 
 -- COMMAND ----------
 
-select count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base
+select count( distinct PROCODET) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base 
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base order by PERSON_ID, SPELL_ID, EPIKEY
+select count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base
+
+-- COMMAND ----------
+
+select year(admidate), count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base group by year(admidate) order by year(admidate)
+
+-- COMMAND ----------
+
+select year(disdate), count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base group by year(disdate) order by year(disdate)
+
+-- COMMAND ----------
+
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base order by PERSON_ID, SPELL_ID, EPIKEY
 
 -- COMMAND ----------
 
@@ -264,12 +276,12 @@ select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base order
 
 -- COMMAND ----------
 
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_episodes_charlson AS
+CREATE OR REPLACE GLOBAL TEMP VIEW nh_${ccu003_04_spec}_temp_episodes_charlson AS
 
 WITH extract_icd_exploded AS
 ( -- CTE where the ICD fields are exploded into rows - one row for each diagnosis in each episode
   SELECT PERSON_ID, SPELL_ID, EPIKEY, posexplode(array(diag_01, diag_02, diag_03, diag_04, diag_05, diag_06, diag_07, diag_08, diag_09, diag_10, diag_11, diag_12, diag_13, diag_14, diag_15, diag_16, diag_17, diag_18, diag_19, diag_20)) AS (pos_icd, icd)
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base
 )
   
 SELECT DISTINCT --Don't double count diagnoses
@@ -304,12 +316,12 @@ LEFT JOIN global_temp.nh_charlson_lookup AS charlson ON extract_icd_exploded.icd
 
 -- COMMAND ----------
 
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_episodes_diagcols AS
+CREATE OR REPLACE GLOBAL TEMP VIEW nh_${ccu003_04_spec}_temp_episodes_diagcols AS
 
 WITH extract_icd_exploded AS
 ( -- CTE where the ICD fields are exploded into rows - one row for each diagnosis in each episode
   SELECT PERSON_ID, SPELL_ID, EPIKEY, TRETSPEF, posexplode(array(diag_01, diag_02, diag_03, diag_04, diag_05, diag_06, diag_07, diag_08, diag_09, diag_10, diag_11, diag_12, diag_13, diag_14, diag_15, diag_16, diag_17, diag_18, diag_19, diag_20)) AS (pos_icd, icd)
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base
 )
   
 SELECT 
@@ -355,13 +367,13 @@ FROM extract_icd_exploded
 
 -- COMMAND ----------
 
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_episodes_opercols AS
+CREATE OR REPLACE GLOBAL TEMP VIEW nh_${ccu003_04_spec}_temp_episodes_opercols AS
 
 WITH extract_opcs_exploded AS
 (
 --Lateral views to incorporate 2 posexplodes. Where clause to link them
   SELECT PERSON_ID, SPELL_ID, EPIKEY, admidate, pos_op, op, pos_op_date, op_date
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base
   LATERAL VIEW posexplode(array(opertn_01, opertn_02, opertn_03, opertn_04, opertn_05, opertn_06, opertn_07, opertn_08, opertn_09, opertn_10, opertn_11, opertn_12, opertn_13, opertn_14, opertn_15, opertn_16, opertn_17, opertn_18, opertn_19, opertn_20, opertn_21, opertn_22, opertn_23, opertn_24)) ops AS pos_op, op
   LATERAL VIEW posexplode(array(opdate_01, opdate_02, opdate_03, opdate_04, opdate_05, opdate_06, opdate_07, opdate_08, opdate_09, opdate_10, opdate_11, opdate_12, opdate_13, opdate_14, opdate_15, opdate_16, opdate_17, opdate_18, opdate_19, opdate_20, opdate_21, opdate_22, opdate_23, opdate_24)) dates AS pos_op_date, op_date
   WHERE ops.pos_op = dates.pos_op_date
@@ -400,21 +412,21 @@ FROM extract_opcs_exploded
 
 -- COMMAND ----------
 
-REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base
+REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base
 
 -- COMMAND ----------
 
-DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1
+DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 AS
+CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes AS
 
   SELECT
   base.PERSON_ID,
   base.SPELL_ID,
   base.EPIKEY,
-  base.Index_Disdate,
+  --base.Index_Disdate,
   base.admiage,
   base.sex,
   base.ethnos,
@@ -517,15 +529,15 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_
   COALESCE(derived_dx.Grouped_diag_epi, 0) AS Grouped_diag,
   COALESCE(derived_dx.Grouped_diag_epi_pos, 0) AS Grouped_diag_pos,
   COALESCE(derived_op.Grouped_proc_epi, 0) AS Grouped_proc
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_episodes_base AS base
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base AS base
   --derived grouped dx
   LEFT OUTER JOIN  
   (
     SELECT DISTINCT a.EPIKEY, MIN(a.Grouped_diag_epi_pos + 1) AS Grouped_diag_epi_pos, b.Grouped_diag_epi
-    FROM global_temp.nh_temp_episodes_diagcols AS a INNER JOIN
+    FROM global_temp.nh_${ccu003_04_spec}_temp_episodes_diagcols AS a INNER JOIN
     (--first find the min hierarchical code. Once found, find the minimum position for it
       SELECT EPIKEY, MIN(GROUPED_DIAG_epi) AS Grouped_diag_epi
-      FROM global_temp.nh_temp_episodes_diagcols WHERE GROUPED_DIAG_epi > 0 GROUP BY EPIKEY
+      FROM global_temp.nh_${ccu003_04_spec}_temp_episodes_diagcols WHERE GROUPED_DIAG_epi > 0 GROUP BY EPIKEY
     ) AS b ON a.EPIKEY = b.EPIKEY AND a.Grouped_diag_epi = b.Grouped_diag_epi
     GROUP BY a.EPIKEY, b.Grouped_diag_epi
   ) AS derived_dx ON base.EPIKEY = derived_dx.EPIKEY
@@ -533,20 +545,20 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_
   LEFT OUTER JOIN
   (
     SELECT EPIKEY, MAX(GROUPED_PROC_epi) AS Grouped_proc_epi
-    FROM global_temp.nh_temp_episodes_opercols WHERE GROUPED_PROC_epi > 0 GROUP BY EPIKEY
+    FROM global_temp.nh_${ccu003_04_spec}_temp_episodes_opercols WHERE GROUPED_PROC_epi > 0 GROUP BY EPIKEY
   ) AS derived_op ON base.EPIKEY = derived_op.EPIKEY
 
 -- COMMAND ----------
 
-ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 OWNER TO `rmhikmc@ucl.ac.uk`
+ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes OWNER TO `rmhikmc@ucl.ac.uk`
 
 -- COMMAND ----------
 
-select count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1
+select count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes
 
 -- COMMAND ----------
 
@@ -560,11 +572,11 @@ select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1
 
 -- COMMAND ----------
 
-DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_spells_base9
+DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_spells_base
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_spells_base9 AS
+CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_spells_base AS
 
   SELECT DISTINCT
   base_spells.*,
@@ -576,20 +588,20 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_spells
   COALESCE(any_derived_op.Grouped_proc_epi, 0) AS Grouped_proc_any
   FROM
   (--base spells
-    SELECT PERSON_ID, SPELL_ID, MIN(Epikey) AS AdmissionEpikey, MAX(Epikey) AS DischargeEpikey, COUNT(*) AS EpisodeCount FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 GROUP BY PERSON_ID, SPELL_ID
+    SELECT PERSON_ID, SPELL_ID, MIN(Epikey) AS AdmissionEpikey, MAX(Epikey) AS DischargeEpikey, COUNT(*) AS EpisodeCount FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes GROUP BY PERSON_ID, SPELL_ID
   ) AS base_spells
   --admission fields
-  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 AS admission_episodes ON base_spells.AdmissionEpikey = admission_episodes.Epikey
+  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes AS admission_episodes ON base_spells.AdmissionEpikey = admission_episodes.Epikey
   --discharge fields
-  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 AS discharge_episodes ON base_spells.DischargeEpikey = discharge_episodes.Epikey
+  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes AS discharge_episodes ON base_spells.DischargeEpikey = discharge_episodes.Epikey
   --derived grouped 'any' dx
   LEFT OUTER JOIN  
   (
     SELECT DISTINCT a.PERSON_ID, a.SPELL_ID, MIN(a.Grouped_diag_pos) AS Grouped_diag_epi_pos, b.Grouped_diag_epi
-    FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 AS a INNER JOIN
+    FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes AS a INNER JOIN
     (--first find the min hierarchical code. Once found, find the minimum position for it
       SELECT PERSON_ID, SPELL_ID, MIN(Grouped_diag) AS Grouped_diag_epi
-      FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 WHERE Grouped_diag > 0 GROUP BY PERSON_ID, SPELL_ID
+      FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes WHERE Grouped_diag > 0 GROUP BY PERSON_ID, SPELL_ID
     ) AS b ON a.PERSON_ID = b.PERSON_ID AND a.SPELL_ID = b.SPELL_ID AND a.Grouped_diag = b.Grouped_diag_epi
     GROUP BY a.PERSON_ID, a.SPELL_ID, b.Grouped_diag_epi
   ) AS any_derived_dx ON base_spells.PERSON_ID = any_derived_dx.PERSON_ID AND base_spells.SPELL_ID = any_derived_dx.SPELL_ID
@@ -597,10 +609,10 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_spells
   LEFT OUTER JOIN
   (
     SELECT DISTINCT a.EPIKEY, MIN(a.Grouped_diag_pos) AS Grouped_diag_epi_pos, b.Grouped_diag_epi
-    FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 AS a INNER JOIN
+    FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes AS a INNER JOIN
     (--first find the min hierarchical code. Once found, find the minimum position for it
       SELECT EPIKEY, MIN(Grouped_diag) AS Grouped_diag_epi
-      FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 WHERE Grouped_diag > 0 GROUP BY EPIKEY
+      FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes WHERE Grouped_diag > 0 GROUP BY EPIKEY
     ) AS b ON a.EPIKEY = b.EPIKEY AND a.Grouped_diag = b.Grouped_diag_epi
     GROUP BY a.EPIKEY, b.Grouped_diag_epi
   ) AS discharge_derived_dx ON base_spells.DischargeEpikey = discharge_derived_dx.EPIKEY
@@ -608,34 +620,34 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_spells
   LEFT OUTER JOIN
   (--find the min hierarchical code for position = 1
     SELECT EPIKEY, MIN(Grouped_diag) AS Grouped_diag_epi
-    FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 WHERE Grouped_diag > 0 AND Grouped_diag_pos = 1 GROUP BY EPIKEY
+    FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes WHERE Grouped_diag > 0 AND Grouped_diag_pos = 1 GROUP BY EPIKEY
   ) AS primary_derived_dx ON base_spells.DischargeEpikey = primary_derived_dx.EPIKEY
   --derived grouped 'any' proc
   LEFT OUTER JOIN
   (
     SELECT PERSON_ID, SPELL_ID, MAX(Grouped_proc) AS Grouped_proc_epi
-    FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 WHERE Grouped_proc > 0 GROUP BY PERSON_ID, SPELL_ID
+    FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes WHERE Grouped_proc > 0 GROUP BY PERSON_ID, SPELL_ID
   ) AS any_derived_op ON base_spells.PERSON_ID = any_derived_op.PERSON_ID AND base_spells.SPELL_ID = any_derived_op.SPELL_ID
 
 -- COMMAND ----------
 
-ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_spells_base9 OWNER TO `rmhikmc@ucl.ac.uk`
+ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_spells_base OWNER TO `rmhikmc@ucl.ac.uk`
 
 -- COMMAND ----------
 
-refresh table dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1
+refresh table dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_spells_base9 where Grouped_diag_pri = 0
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_spells_base where Grouped_diag_pri = 0
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 where spell_id = 4915168147
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes where spell_id = 5068286873
 
 -- COMMAND ----------
 
-DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells
+DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells
 
 -- COMMAND ----------
 
@@ -644,7 +656,7 @@ DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells AS
+CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells AS
 
 SELECT
 --Main fields
@@ -673,9 +685,9 @@ COALESCE(ICU_admit.ICU_ADMIT, 0) AS ADMISSION_TO_ITU,
   Charlson.CHARLSON_DIABETES_WO_CHRON*1+
   Charlson.CHARLSON_HEMIPLEGIA_PARAPLEGIA*2+
   Charlson.CHARLSON_METASTATIC_CANCER*1+
-  Charlson.CHARLSON_MYOCARD_INFARCT*1+
+  Charlson.CHARLSON_MYOCARD_INFARCT*1+ 
   Charlson.CHARLSON_PEPTIC_ULCER*1+
-  Charlson.CHARLSON_PERIPH_VASC*1+
+  Charlson.CHARLSON_PERIPH_VASC*0+
   Charlson.CHARLSON_RENAL*2+
   Charlson.CHARLSON_RHEUMATIC*1+
   Charlson.CHARLSON_SEVERE_LIVER*3+
@@ -700,33 +712,32 @@ Charlson.CHARLSON_SEVERE_LIVER,
 Charlson.CHARLSON_HIV,
 Charlson.CHARLSON_MILD_LIVER
 
-FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_spells_base9 AS base 
+FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_spells_base AS base 
 
 --Grouped cov / death
 LEFT OUTER JOIN
 (--derived columns episodes table for covid
   SELECT PERSON_ID, SPELL_ID, MAX(POSS_COVID_epi) AS Poss_covid_epi
-  FROM global_temp.nh_temp_episodes_diagcols WHERE POSS_COVID_epi > 0 GROUP BY PERSON_ID, SPELL_ID
+  FROM global_temp.nh_${ccu003_04_spec}_temp_episodes_diagcols WHERE POSS_COVID_epi > 0 GROUP BY PERSON_ID, SPELL_ID
 ) AS Poss_covid ON base.PERSON_ID = Poss_covid.PERSON_ID AND base.SPELL_ID = Poss_covid.SPELL_ID
 LEFT OUTER JOIN
 (--base episodes table for died
   SELECT PERSON_ID, SPELL_ID, MAX(died) AS Died
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 WHERE died > 0 GROUP BY PERSON_ID, SPELL_ID
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes WHERE died > 0 GROUP BY PERSON_ID, SPELL_ID
 ) AS Died ON base.PERSON_ID = Died.PERSON_ID AND base.SPELL_ID = Died.SPELL_ID
 
 --Other grouped dx/op fields - add or remove as applicable
 LEFT OUTER JOIN
 (--derived columns episodes table for AA ICU admission
   SELECT PERSON_ID, SPELL_ID, MAX(ICU_ADMIT) AS ICU_admit
-  FROM global_temp.nh_temp_episodes_diagcols WHERE ICU_ADMIT > 0 GROUP BY PERSON_ID, SPELL_ID
+  FROM global_temp.nh_${ccu003_04_spec}_temp_episodes_diagcols WHERE ICU_ADMIT > 0 GROUP BY PERSON_ID, SPELL_ID
 ) AS ICU_admit ON base.PERSON_ID = ICU_admit.PERSON_ID AND base.SPELL_ID = ICU_admit.SPELL_ID
 
 LEFT OUTER JOIN
 (--derived columns episodes table for AA type & location
   SELECT PERSON_ID, SPELL_ID, MAX(AA_TYPE_LOC_epi) AS AA_TYPE_LOC
-  FROM global_temp.nh_temp_episodes_diagcols WHERE AA_TYPE_LOC_epi > 0 GROUP BY PERSON_ID, SPELL_ID
+  FROM global_temp.nh_${ccu003_04_spec}_temp_episodes_diagcols WHERE AA_TYPE_LOC_epi > 0 GROUP BY PERSON_ID, SPELL_ID
 ) AS AA_type_loc ON base.PERSON_ID = AA_TYPE_LOC.PERSON_ID AND base.SPELL_ID = AA_TYPE_LOC.SPELL_ID
-
 
 --Charlson
 LEFT OUTER JOIN
@@ -751,18 +762,22 @@ LEFT OUTER JOIN
     MAX(CHARLSON_SEVERE_LIVER) AS CHARLSON_SEVERE_LIVER,
     MAX(CHARLSON_HIV) AS CHARLSON_HIV,
     MAX(CHARLSON_MILD_LIVER) AS CHARLSON_MILD_LIVER
-  FROM global_temp.nh_temp_episodes_charlson
+  FROM global_temp.nh_${ccu003_04_spec}_temp_episodes_charlson
   GROUP BY PERSON_ID, SPELL_ID
 ) AS Charlson ON base.PERSON_ID = Charlson.PERSON_ID AND base.SPELL_ID = Charlson.SPELL_ID
 
 
 -- COMMAND ----------
 
-ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells OWNER TO `rmhikmc@ucl.ac.uk`
+ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells OWNER TO `rmhikmc@ucl.ac.uk`
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells where GROUPED_DIAGNOSIS_PRIMARY > 0
+select count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells
+
+-- COMMAND ----------
+
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells where GROUPED_DIAGNOSIS_PRIMARY > 0
 
 -- COMMAND ----------
 
@@ -787,10 +802,12 @@ select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells where 
 
 -- COMMAND ----------
 
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_superspells_base1 AS
+CREATE OR REPLACE GLOBAL TEMP VIEW nh_${ccu003_04_spec}_temp_superspells_base AS
 
 WITH cte AS
-(SELECT PERSON_ID, SPELL_ID, Admidate, Disdate, Disdest, Dismeth, SPELL_ID, Admidate, Disdate, Admimeth, Dismeth, PRIMARY_DISCHARGE_DIAGNOSIS_CODE, ROW_NUMBER() OVER (PARTITION BY PERSON_ID ORDER BY Admidate, Disdate, SPELL_ID) AS RowNo FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells WHERE SPELL_ID IS NOT NULL)
+(
+  SELECT PERSON_ID, SPELL_ID, Admidate, Disdate, Disdest, Dismeth, SPELL_ID, Admidate, Disdate, Admimeth, Dismeth, PRIMARY_DISCHARGE_DIAGNOSIS_CODE, ROW_NUMBER() OVER (PARTITION BY PERSON_ID ORDER BY Admidate, Disdate, SPELL_ID) AS RowNo FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells WHERE SPELL_ID IS NOT NULL
+)
 
 SELECT TransOut.PERSON_ID, TransOut.SPELL_ID AS Out_SPELL_ID, TransOut.Admidate AS Out_Admidate, TransOut.Disdate AS Out_Disdate, TransOut.Disdest AS Out_Disdest, TransOut.Dismeth AS Out_Dismeth, TransOut.PRIMARY_DISCHARGE_DIAGNOSIS_CODE AS Out_Primary_dx, TransOut.RowNo AS Out_RowNo, TransIn.SPELL_ID AS In_SPELL_ID, TransIn.Admidate AS In_Admidate, TransIn.Disdate AS In_Disdate, TransIn.Admimeth AS In_Admimeth, TransIn.Dismeth AS In_Dismeth, TransIn.PRIMARY_DISCHARGE_DIAGNOSIS_CODE AS In_Primary_dx, TransIn.RowNo AS In_RowNo FROM
 (
@@ -805,25 +822,50 @@ ORDER BY TransOut.PERSON_ID, TransOut.SPELL_ID
 
 -- COMMAND ----------
 
-REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells
+REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells
 
 -- COMMAND ----------
 
-DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_base1
+DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_base
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_base1 AS
+--Will result in SuperSpellNo values not necessarily starting at 1 for some people, but that's fine - we just need to differentiate between the superspells
 
-SELECT *, ROW_NUMBER() OVER (PARTITION BY PERSON_ID ORDER BY Out_RowNo) AS SpellOrder FROM global_temp.nh_temp_superspells_base1
+CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_base AS
+
+WITH cte AS
+(
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY PERSON_ID ORDER BY Out_RowNo) AS SpellOrder FROM global_temp.nh_${ccu003_04_spec}_temp_superspells_base
+)
+
+SELECT *, ROW_NUMBER() OVER (PARTITION BY PERSON_ID, SuperSpellNo ORDER BY SpellOrder) AS SuperSpell_SpellNo
+FROM
+(
+  SELECT former.*, former.In_RowNo - former.SpellOrder AS SuperSpellNo--, IF(latter.PERSON_ID IS NULL, 1, 0) AS SuperSpellEnd, latter.*
+  FROM cte AS former
+  LEFT JOIN cte AS latter
+  ON former.PERSON_ID = latter.PERSON_ID AND former.SpellOrder = latter.SpellOrder -1 AND former.In_RowNo = latter.Out_RowNo
+)
+
+--where former.person_id = 'Q5WLH8FM5UIP66S'
+--ORDER BY former.PERSON_ID, former.SpellOrder
 
 -- COMMAND ----------
 
-ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_base1 OWNER TO `rmhikmc@ucl.ac.uk`
+ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_base   OWNER TO `rmhikmc@ucl.ac.uk`
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_base1 ORDER BY PERSON_ID, SpellOrder
+select * from 
+(
+select PERSON_ID, count(distinct in_spell_id) as c from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_base group by person_id --ORDER BY PERSON_ID, count(distinct in_spell_id) desc
+)
+order by c desc
+
+-- COMMAND ----------
+
+ select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_base where person_id = 'Q5WLH8FM5UIP66S' order by SpellOrder
 
 -- COMMAND ----------
 
@@ -838,23 +880,49 @@ select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_base1 O
 
 -- COMMAND ----------
 
-DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1
+DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS
+CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS
 
 SELECT PERSON_ID, Out_Spell_ID AS Superspell_ID, Out_Spell_ID AS Spell_ID, Out_Disdate AS Disdate, Out_Dismeth AS Dismeth, Out_Primary_dx AS Primary_dx, 1 AS SpellNo
-FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_base1 WHERE SpellOrder = 1
+FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_base WHERE SuperSpell_SpellNo = 1
 
 -- COMMAND ----------
 
-ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 OWNER TO `rmhikmc@ucl.ac.uk`
+ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup OWNER TO `rmhikmc@ucl.ac.uk`
 
 -- COMMAND ----------
 
 -- MAGIC %md
 -- MAGIC The below is in python as it requires an iterative process to build up the superspells and spark SQL doesn't have any concept of recursion
+
+-- COMMAND ----------
+
+-- MAGIC %py
+-- MAGIC 
+-- MAGIC specname = dbutils.widgets.get("ccu003_04_spec")
+-- MAGIC 
+-- MAGIC #df1 = spark.sql(f"SELECT * FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_acs_superspells_base")
+-- MAGIC #print(df1.count())
+-- MAGIC 
+-- MAGIC #df2 = spark.sql(f"SELECT * FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_acs_superspells_lookup")
+-- MAGIC #print(df2.count())
+-- MAGIC 
+-- MAGIC qry = f"SELECT lookup.PERSON_ID, lookup.Superspell_ID, base.In_Spell_ID AS Spell_ID, base.In_Disdate AS Disdate, base.In_Dismeth as Dismeth, base.In_Primary_dx as Primary_dx, base.SuperSpell_SpellNo + 1 AS SpellNo \
+-- MAGIC FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_{specname}_temp_superspells_base AS base INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_{specname}_temp_superspells_lookup AS lookup ON base.Out_Spell_ID = lookup.Spell_ID AND base.PERSON_ID = lookup.Person_ID \
+-- MAGIC WHERE base.In_Spell_ID NOT IN (SELECT Spell_ID FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_{specname}_temp_superspells_lookup WHERE Person_ID = lookup.PERSON_ID AND Superspell_ID = lookup.Superspell_ID)"
+-- MAGIC 
+-- MAGIC rowcount = 1
+-- MAGIC loopcount = 1
+-- MAGIC 
+-- MAGIC while rowcount > 0:
+-- MAGIC   loopcount += 1
+-- MAGIC   df = spark.sql(qry)  
+-- MAGIC   rowcount = df.count()
+-- MAGIC   print(f"Superspells with {loopcount} or more spells: {df.count()}")
+-- MAGIC   df.write.insertInto(f"dars_nic_391419_j3w9t_collab.ccu003_04_nh_{specname}_temp_superspells_lookup", overwrite = False)
 
 -- COMMAND ----------
 
@@ -866,36 +934,36 @@ ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 O
 -- MAGIC #df2 = spark.sql(f"SELECT * FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_acs_superspells_lookup")
 -- MAGIC #print(df2.count())
 -- MAGIC 
--- MAGIC qry = """SELECT lookup.PERSON_ID, lookup.Superspell_ID, base.In_Spell_ID AS Spell_ID, base.In_Disdate AS Disdate, base.In_Dismeth as Dismeth, base.In_Primary_dx as Primary_dx, base.SpellOrder + 1 AS SpellNo 
--- MAGIC FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_base1 AS base INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS lookup ON base.Out_Spell_ID = lookup.Spell_ID AND base.PERSON_ID = lookup.Person_ID
--- MAGIC WHERE base.In_Spell_ID NOT IN (SELECT Spell_ID FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 WHERE Person_ID = lookup.PERSON_ID AND Superspell_ID = lookup.Superspell_ID)"""
+-- MAGIC #qry = """SELECT lookup.PERSON_ID, lookup.Superspell_ID, base.In_Spell_ID AS Spell_ID, base.In_Disdate AS Disdate, base.In_Dismeth as Dismeth, base.In_Primary_dx as Primary_dx, base.SuperSpell_SpellNo + 1 AS SpellNo 
+-- MAGIC #FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_base AS base INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS lookup ON base.Out_Spell_ID = lookup.Spell_ID AND base.PERSON_ID = lookup.Person_ID
+-- MAGIC #WHERE base.In_Spell_ID NOT IN (SELECT Spell_ID FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup WHERE Person_ID = lookup.PERSON_ID AND Superspell_ID = lookup.Superspell_ID)"""
 -- MAGIC 
--- MAGIC rowcount = 1
--- MAGIC loopcount = 1
+-- MAGIC #rowcount = 1
+-- MAGIC #loopcount = 1
 -- MAGIC 
--- MAGIC while rowcount > 0:
--- MAGIC   loopcount += 1
--- MAGIC   df = spark.sql(qry)  
--- MAGIC   rowcount = df.count()
--- MAGIC   print(f"Superspells with " + f'{loopcount}' + " or more spells: " + f'{df.count()}')
--- MAGIC   df.write.insertInto('dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1', overwrite = False)
+-- MAGIC #while rowcount > 0:
+-- MAGIC #  loopcount += 1
+-- MAGIC #  df = spark.sql(qry)  
+-- MAGIC #  rowcount = df.count()
+-- MAGIC #  print(f"Superspells with " + f'{loopcount}' + " or more spells: " + f'{df.count()}')
+-- MAGIC #  df.write.insertInto('dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup', overwrite = False)
 
 -- COMMAND ----------
 
-SELECT * FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 ORDER BY Person_ID, Superspell_ID, SpellNo
+SELECT * FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup ORDER BY Person_ID, Superspell_ID, SpellNo
 
 -- COMMAND ----------
 
-select person_ID, superspell_ID, count(superspell_ID) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 group by person_ID, superspell_ID order by count(superspell_ID) desc, person_id asc
+select person_ID, superspell_ID, count(superspell_ID) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup group by person_ID, superspell_ID order by count(superspell_ID) desc, person_id asc
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_base1 where person_id = '6PUZHW64W1HOWSN'
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_episodes_base where person_id = '23K6SLCQ5DIJZEI' order by epistart, epiorder
 
 -- COMMAND ----------
 
 select spellcount, count(spellcount) from
-(select person_ID, superspell_ID, count(superspell_ID) as spellcount from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 group by person_ID, superspell_ID)
+(select person_ID, superspell_ID, count(superspell_ID) as spellcount from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup group by person_ID, superspell_ID)
 group by spellcount
 order by count(spellcount) asc
 
@@ -906,10 +974,10 @@ order by count(spellcount) asc
 
 -- COMMAND ----------
 
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_superspells_admission AS
+CREATE OR REPLACE GLOBAL TEMP VIEW nh_${ccu003_04_spec}_temp_superspells_admission AS
 
-SELECT base.Person_ID, base.Superspell_ID, spells.Spell_ID, spells.Procodet, spells.Admidate, spells.Admiage, spells.Sex, Spells.Ethnos, Spells.Resgor_ons, spells.Admimeth FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS base
-INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells spells on base.Person_ID = spells.Person_ID and base.Spell_ID = spells.Spell_ID
+SELECT base.Person_ID, base.Superspell_ID, spells.Spell_ID, spells.Procodet, spells.Admidate, spells.Admiage, spells.Sex, Spells.Ethnos, Spells.Resgor_ons, spells.Admimeth FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS base
+INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells spells on base.Person_ID = spells.Person_ID and base.Spell_ID = spells.Spell_ID
 WHERE base.SpellNo = 1
 
 -- COMMAND ----------
@@ -920,12 +988,12 @@ WHERE base.SpellNo = 1
 
 -- COMMAND ----------
 
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_superspells_discharge AS --maybe not needed
+CREATE OR REPLACE GLOBAL TEMP VIEW nh_${ccu003_04_spec}_temp_superspells_discharge AS --maybe not needed
 
-SELECT base.* FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS base
+SELECT base.* FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS base
 INNER JOIN
 (
-  SELECT Person_ID, Superspell_ID AS Spell_ID, MAX(SpellNo) AS LastSpellNo FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 GROUP BY Person_ID, Superspell_ID
+  SELECT Person_ID, Superspell_ID AS Spell_ID, MAX(SpellNo) AS LastSpellNo FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup GROUP BY Person_ID, Superspell_ID
 ) AS dis
 ON base.Person_ID = dis.Person_ID AND base.Superspell_ID = dis.Spell_ID AND base.SpellNo = dis.LastSpellNo
 
@@ -936,7 +1004,7 @@ ON base.Person_ID = dis.Person_ID AND base.Superspell_ID = dis.Spell_ID AND base
 
 -- COMMAND ----------
 
-CREATE OR REPLACE GLOBAL TEMP VIEW nh_temp_superspells_derived_groups AS
+CREATE OR REPLACE GLOBAL TEMP VIEW nh_${ccu003_04_spec}_temp_superspells_derived_groups AS
 
 WITH cte AS
 (  
@@ -946,8 +1014,8 @@ WITH cte AS
   spells.GROUPED_DIAGNOSIS_DISCHARGE, spells.GROUPED_DIAGNOSIS_DISCHARGE_POSITION,
   spells.GROUPED_DIAGNOSIS_PRIMARY, spells.PRIMARY_DISCHARGE_DIAGNOSIS_CODE,
   spells.GROUPED_PROCEDURE
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells AS spells --to provide dx info
-  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS base --to provide superspell info
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells AS spells --to provide dx info
+  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS base --to provide superspell info
   ON base.Person_ID = spells.Person_ID AND base.Spell_ID = spells.Spell_ID
 )
 
@@ -1028,15 +1096,15 @@ INNER JOIN
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_episodes1 where person_id = '8G9W3O906IIDB2L' order by spell_id, epiorder
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_episodes where person_id = '8G9W3O906IIDB2L' order by spell_id, epiorder
 
 -- COMMAND ----------
 
-REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells
+REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells
 
 -- COMMAND ----------
 
-REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1
+REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup
 
 -- COMMAND ----------
 
@@ -1045,11 +1113,15 @@ REFRESH TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1
 
 -- COMMAND ----------
 
-DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_superspells 
+DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_superspells 
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_superspells AS
+--select count(distinct procodet) from dars_nic_391419_j3w9t_collab.ccu003_04_nh_final_acs_admissions_dx
+
+-- COMMAND ----------
+
+CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_superspells AS
 
 SELECT
 --Standard fields
@@ -1085,7 +1157,7 @@ ADMISSION_TO_ITU,
   CHARLSON_METASTATIC_CANCER*1+
   CHARLSON_MYOCARD_INFARCT*1+ 
   CHARLSON_PEPTIC_ULCER*1+
-  CHARLSON_PERIPH_VASC*1+
+  CHARLSON_PERIPH_VASC*0+
   CHARLSON_RENAL*2+
   CHARLSON_RHEUMATIC*1+
   CHARLSON_SEVERE_LIVER*3+
@@ -1112,17 +1184,17 @@ CHARLSON_MILD_LIVER
 FROM
 (--Admission spell
   SELECT base.Person_ID, base.Superspell_ID, spells.Spell_ID, spells.Procodet, spells.Admidate, spells.Admiage, spells.Sex, Spells.Ethnos, Spells.Resgor_ons, spells.Admimeth
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS base
-  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells AS spells
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS base
+  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells AS spells
   ON base.Person_ID = spells.Person_ID AND base.Spell_ID = spells.Spell_ID
   WHERE base.SpellNo = 1
 ) AS admi
 INNER JOIN
 (--Discharge spell
-  SELECT base.Disdate, base.Dismeth, base.Primary_dx, base.Person_ID, base.SuperSpell_ID FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS base --these items have been carried through into the lookup for ease of access
+  SELECT base.Disdate, base.Dismeth, base.Primary_dx, base.Person_ID, base.SuperSpell_ID FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS base --these items have been carried through into the lookup for ease of access
   INNER JOIN
   (
-    SELECT Person_ID, Superspell_ID AS Spell_ID, MAX(SpellNo) AS LastSpellNo FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 GROUP BY Person_ID, Superspell_ID --assumes SpellNo is applied in chronological order
+    SELECT Person_ID, Superspell_ID AS Spell_ID, MAX(SpellNo) AS LastSpellNo FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup GROUP BY Person_ID, Superspell_ID --assumes SpellNo is applied in chronological order
   ) AS dis
   ON base.Person_ID = dis.Person_ID AND base.Superspell_ID = dis.Spell_ID AND base.SpellNo = dis.LastSpellNo
 ) AS dis
@@ -1140,7 +1212,7 @@ INNER JOIN
     MAX(DIED_DURING_ADMISSION) AS DIED_DURING_ADMISSION,   
     --Additional grouped dx/op fields - add or remove as applicable
     MAX(AA_DIAGNOSIS_TYPE_LOCATION) AS AA_DIAGNOSIS_TYPE_LOCATION,
-    MAX(ADMISSION_TO_ITU) AS ADMISSION_TO_ITU,    
+    MAX(ADMISSION_TO_ITU) AS ADMISSION_TO_ITU,   
     --Charlson
     MAX(CHARLSON_CANCER) AS CHARLSON_CANCER,
     MAX(CHARLSON_CEREBRO) AS CHARLSON_CEREBRO,
@@ -1159,20 +1231,20 @@ INNER JOIN
     MAX(CHARLSON_SEVERE_LIVER) AS CHARLSON_SEVERE_LIVER,
     MAX(CHARLSON_HIV) AS CHARLSON_HIV,
     MAX(CHARLSON_MILD_LIVER) AS CHARLSON_MILD_LIVER
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells AS spells
-  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS base
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells AS spells
+  INNER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS base
   ON base.Person_ID = spells.Person_ID AND base.Spell_ID = spells.Spell_ID
   GROUP BY base.Person_ID, base.Superspell_ID
 ) AS derived
 ON admi.Person_ID = derived.Person_ID AND admi.Superspell_ID = derived.Superspell_ID
 LEFT OUTER JOIN
 --Derived grouped dx/op
-global_temp.nh_temp_superspells_derived_groups AS derived_groups
+global_temp.nh_${ccu003_04_spec}_temp_superspells_derived_groups AS derived_groups
 ON admi.Person_ID = derived_groups.Person_ID AND admi.Superspell_ID = derived_groups.Superspell_ID
 
 -- COMMAND ----------
 
-ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_superspells OWNER TO `rmhikmc@ucl.ac.uk`
+ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_superspells OWNER TO `rmhikmc@ucl.ac.uk`
 
 -- COMMAND ----------
 
@@ -1186,11 +1258,11 @@ ALTER TABLE dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_superspells OWN
 
 -- COMMAND ----------
 
-DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v1
+DROP TABLE IF EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v4
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v1 AS 
+CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v5 AS 
 
   SELECT
   --Main fields
@@ -1242,8 +1314,8 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_a
   CHARLSON_SEVERE_LIVER,
   CHARLSON_HIV,
   CHARLSON_MILD_LIVER
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_spells AS base
-  FULL OUTER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_superspells_lookup1 AS lookup ON base.Person_ID = lookup.Person_ID AND base.Spell_ID = lookup.Spell_ID
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_spells AS base
+  FULL OUTER JOIN dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_superspells_lookup AS lookup ON base.Person_ID = lookup.Person_ID AND base.Spell_ID = lookup.Spell_ID
   WHERE lookup.Spell_ID IS NULL
   
   UNION ALL
@@ -1273,10 +1345,10 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_a
   GROUPED_DIAGNOSIS_PRIMARY AS AA_DIAGNOSIS_PRIMARY,
   PRIMARY_DISCHARGE_DIAGNOSIS_CODE,
   GROUPED_PROCEDURE AS AA_PROCEDURE,  
-  --Grouped cov / death fields
+  --Grouped cov / deaths fields
   POSS_COVID,
   DIED_DURING_ADMISSION,
-  --Other grouped dx/op fields - add or remove as applicable
+  --Other grouped fields - add or remove as applicable
   AA_DIAGNOSIS_TYPE_LOCATION,
   ADMISSION_TO_ITU,
   --Charlson
@@ -1298,7 +1370,7 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_a
   CHARLSON_SEVERE_LIVER,
   CHARLSON_HIV,
   CHARLSON_MILD_LIVER
-  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_temp_final_superspells 
+  FROM dars_nic_391419_j3w9t_collab.ccu003_04_nh_${ccu003_04_spec}_temp_final_superspells 
 
 -- COMMAND ----------
 
@@ -1308,12 +1380,28 @@ CREATE TABLE IF NOT EXISTS dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_a
 
 -- COMMAND ----------
 
-select * from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v1
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v4
 
 -- COMMAND ----------
 
-select count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v1
+refresh table dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v5
 
 -- COMMAND ----------
 
-select count(distinct PERSON_ID) from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v1
+select count(*) from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v5
+
+-- COMMAND ----------
+
+select count(distinct SPELL_ID) from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v5
+
+-- COMMAND ----------
+
+select count(distinct PERSON_ID) from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v5
+
+-- COMMAND ----------
+
+select * from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v5 where person_id = '09T80C90ZOFDJDD'
+
+-- COMMAND ----------
+
+select count(distinct procodet) from dars_nic_391419_j3w9t_collab.ccu003_04_kmc_final_AA_admissions_dx_v5
