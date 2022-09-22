@@ -1,8 +1,8 @@
-# Quantifying the impact of the COVID-19 pandemic on the provision of cardiovascular disease-related hospital healthcare in the UK
+# Indirect effects of the first two years of the COVID-19 pandemic on secondary care for cardiovascular disease in the UK: an electronic health record analysis across three nations
 
 ## Project description
 
-Description will be added here.
+Coronavirus (COVID-19) causes direct morbidity and mortality, and indirect impact on non-COVID services, such as cardiovascular disease (CVD), which has been disproportionately affected, yet lacking coordinated policy responses. We analysed hospital-based activity before and during the pandemic, across major CVD subtypes in England, Scotland and Wales.
 
 ## How to cite this work
 > Citation goes here
