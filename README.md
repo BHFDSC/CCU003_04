@@ -13,7 +13,6 @@ Coronavirus (COVID-19) causes direct morbidity and mortality, and indirect impac
 * [View the analysis code and phenotypes used in the Safe Haven](https://github.com/BHFDSC/CCU003_04/tree/main/scotland)
 * [View the analysis code and phenotypes used in the SAIL Databank](https://github.com/BHFDSC/CCU003_04/tree/main/wales)
 * [View the code used outside of the environments to prepare tables and figures for publication](https://github.com/BHFDSC/CCU003_04/tree/main/outside)
-* [View the final ouput of our analysis](https://github.com/BHFDSC/CCU003_04/tree/main/outside/output)
 
 ## Project approval
 
