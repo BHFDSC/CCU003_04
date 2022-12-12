@@ -5,7 +5,7 @@
 Coronavirus (COVID-19) causes direct morbidity and mortality, and indirect impact on non-COVID services, such as cardiovascular disease (CVD), which has been disproportionately affected, yet lacking coordinated policy responses. We analysed hospital-based activity before and during the pandemic, across major CVD subtypes in England, Scotland and Wales.
 
 ## How to cite this work
-Preprint available on medRxiv: https://doi.org/10.1101/2022.10.13.22281031
+Wright, F Lucy et al. Effects of the COVID-19 pandemic on secondary care for cardiovascular disease in the UK: an electronic health record analysis across three countries. European Heart Journal - Quality of Care & Clinical Outcomes, 2022, qcac077, DOI: https://doi.org/10.1093/ehjqcco/qcac077
 
 ## Contents
 
